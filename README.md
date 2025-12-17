@@ -5,6 +5,14 @@
 This project is designed for handheld console workflows: it runs from the **ArkOS Tools** menu and uses a `dialog` UI rendered on `/dev/tty1`, with optional gamepad-to-keyboard mapping via `gptokeyb`. 
 
 ---
+## Support
+
+If this project helps you, you can support it with a one-time donation:
+
+- GitHub Sponsors (via the **Sponsor** button on this repository / my profile)
+- Buy Me a Coffee: https://buymeacoffee.com/kutaos
+- PayPal: https://www.paypal.me/kutaos
+---
 
 ## Key Features
 
