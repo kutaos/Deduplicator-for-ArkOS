@@ -1,431 +1,318 @@
-Deduplicator for ArkOS (R36S / RG351 etc.)
+Below is a ready-to-paste **`README.md`** (English) based on the current `Deduplicator.sh` implementation. 
 
-Deduplicator.sh is an on-device ROM deduplication utility for ArkOS that helps you find duplicate ROMs by content hash (MD5) and safely move duplicates (and optionally broken ZIP archives) into a restorable DedupBin instead of deleting them.
+---
 
-This project is designed for handheld console workflows: it runs from the ArkOS Tools menu and uses a dialog UI rendered on /dev/tty1, with optional gamepad-to-keyboard mapping via gptokeyb. 
+# Deduplicator for ArkOS (R36S / RG351 etc.)
 
-Deduplicator
+`Deduplicator.sh` is an on-device ROM deduplication utility for ArkOS that helps you find duplicate ROMs by **content hash (MD5)** and safely move duplicates (and optionally broken ZIP archives) into a restorable **DedupBin** instead of deleting them.
 
-Key Features
-Safe-by-design file handling
+This project is designed for handheld console workflows: it runs from the **ArkOS Tools** menu and uses a `dialog` UI rendered on `/dev/tty1`, with optional gamepad-to-keyboard mapping via `gptokeyb`. 
 
-No permanent deletion during deduplication
+---
 
-Duplicate ROM files are moved to DedupBin (they can be restored later). 
+## Key Features
 
-Deduplicator
+### Safe-by-design file handling
 
-A permanent delete exists only as an explicit tool: “Delete DedupBin (permanently)”. 
+* **No permanent deletion during deduplication**
 
-Deduplicator
+  * Duplicate ROM files are **moved** to `DedupBin` (they can be restored later). 
+* A **permanent delete** exists only as an explicit tool: **“Delete DedupBin (permanently)”**. 
 
-Content-based deduplication (MD5)
+### Content-based deduplication (MD5)
 
-Duplicates are identified by MD5 of ROM content, not by filename. 
+* Duplicates are identified by **MD5 of ROM content**, not by filename. 
+* For ZIP files, MD5 is computed from the **single valid ROM file inside the ZIP** (see ZIP rules below). 
 
-Deduplicator
+### Two deduplication modes
 
-For ZIP files, MD5 is computed from the single valid ROM file inside the ZIP (see ZIP rules below). 
+* **PER** – deduplicate **within each emulator** (optionally restrict scanning to one chosen emulator folder). 
+* **ALL** – deduplicate **across all emulators together** (global hash space). 
 
-Deduplicator
+### ZIP handling and broken ZIP management
 
-Two deduplication modes
+* ZIP archives are supported for hashing when:
 
-PER – deduplicate within each emulator (optionally restrict scanning to one chosen emulator folder). 
+  * the archive contains **exactly one ROM file**, and
+  * the inner ROM extension matches allowed extensions for that emulator. 
+* Broken ZIPs are:
 
-Deduplicator
+  * logged as `BROKEN_ZIP`,
+  * counted in the Summary,
+  * optionally moved to DedupBin (same safety model as duplicates). 
 
-ALL – deduplicate across all emulators together (global hash space). 
+### Empty MD5 outputs are ignored
 
-Deduplicator
+* If a computed MD5 equals the “empty stream” hash (`d41d8…`), that candidate is **excluded from comparison** (not logged as broken). 
 
-ZIP handling and broken ZIP management
+### Subfolder support
 
-ZIP archives are supported for hashing when:
+* ROM candidates are collected recursively under `/roms/<emu>/...` (and `/roms2/<emu>/...`), excluding `images/` and `videos/` subpaths. 
 
-the archive contains exactly one ROM file, and
+### Log with summary and end marker
 
-the inner ROM extension matches allowed extensions for that emulator. 
+* Writes a detailed log to:
+  `/opt/system/Tools/Deduplicator.log` 
+* Summary is inserted near the top (after `Mode : ...`).
+* A clear end marker is appended:
+  `----- END OF LOG FILE (YYYY-MM-DD HH:MM:SS) -----` 
 
-Deduplicator
-
-Broken ZIPs are:
-
-logged as BROKEN_ZIP,
-
-counted in the Summary,
-
-optionally moved to DedupBin (same safety model as duplicates). 
-
-Deduplicator
-
-Empty MD5 outputs are ignored
-
-If a computed MD5 equals the “empty stream” hash (d41d8…), that candidate is excluded from comparison (not logged as broken). 
-
-Deduplicator
-
-Subfolder support
-
-ROM candidates are collected recursively under /roms/<emu>/... (and /roms2/<emu>/...), excluding images/ and videos/ subpaths. 
-
-Deduplicator
-
-Log with summary and end marker
-
-Writes a detailed log to:
-/opt/system/Tools/Deduplicator.log 
-
-Deduplicator
-
-Summary is inserted near the top (after Mode : ...).
-
-A clear end marker is appended:
------ END OF LOG FILE (YYYY-MM-DD HH:MM:SS) ----- 
-
-Deduplicator
-
-Extra tools beyond deduplication
+### Extra tools beyond deduplication
 
 From the main menu, the script also provides:
 
-View log (with automatic line wrapping for small screens) 
+* View log (with automatic line wrapping for small screens) 
+* Delete log 
+* Media cleanup: move orphaned images/videos into DedupBin 
+* Restore everything from DedupBin back to ROM folders (non-destructive restore; no overwrite) 
+* Purge DedupBin permanently (explicit destructive operation) 
 
-Deduplicator
+---
 
-Delete log 
+## Installation (ArkOS)
 
-Deduplicator
+1. Copy `Deduplicator.sh` into your Tools folder on the SD card you use for ROM storage:
 
-Media cleanup: move orphaned images/videos into DedupBin 
+   * If you store ROMs on SD1:
+     `roms/tools/`
+   * If you store ROMs on SD2:
+     `roms2/tools/`
 
-Deduplicator
-
-Restore everything from DedupBin back to ROM folders (non-destructive restore; no overwrite) 
-
-Deduplicator
-
-Purge DedupBin permanently (explicit destructive operation) 
-
-Deduplicator
-
-Installation (ArkOS)
-
-Copy Deduplicator.sh into your Tools folder on the SD card you use for ROM storage:
-
-If you store ROMs on SD1:
-roms/tools/
-
-If you store ROMs on SD2:
-roms2/tools/
-
-Safely eject the SD card(s), boot into ArkOS, open Tools, and run Deduplicator.sh.
+2. Safely eject the SD card(s), boot into ArkOS, open **Tools**, and run **Deduplicator.sh**.
 
 That’s it—no extra installation steps are required. 
 
-Deduplicator
+---
 
-Requirements
+## Requirements
 
 This script assumes an ArkOS environment with:
 
-bash
+* `bash`
+* `dialog`
+* standard core utilities: `find`, `stat`, `awk`, `sed`, `fold`, `expand` (optional), `md5sum`
+* ZIP support via `unzip` (Info-ZIP)
+* optional controller mapping: `/opt/inttools/gptokeyb` and `/opt/inttools/keys.gptk` 
 
-dialog
+The script elevates to root automatically (via `sudo`) because ArkOS input handling and `gptokeyb` mapping typically require it. 
 
-standard core utilities: find, stat, awk, sed, fold, expand (optional), md5sum
+---
 
-ZIP support via unzip (Info-ZIP)
+## Main Menu Overview
 
-optional controller mapping: /opt/inttools/gptokeyb and /opt/inttools/keys.gptk 
+When launched, you get a `dialog` menu with these actions: 
 
-Deduplicator
+1. **Deduplicate ROMs**
+2. **Move duplicates / broken ZIP to DedupBin**
+3. **View Deduplicator.log**
+4. **Move orphaned images/videos to DedupBin**
+5. **Restore from DedupBin**
+6. **Delete Deduplicator.log**
+7. **Delete DedupBin (permanently)**
+8. **Exit**
 
-The script elevates to root automatically (via sudo) because ArkOS input handling and gptokeyb mapping typically require it. 
+---
 
-Deduplicator
+## How Deduplication Works
 
-Main Menu Overview
-
-When launched, you get a dialog menu with these actions: 
-
-Deduplicator
-
-Deduplicate ROMs
-
-Move duplicates / broken ZIP to DedupBin
-
-View Deduplicator.log
-
-Move orphaned images/videos to DedupBin
-
-Restore from DedupBin
-
-Delete Deduplicator.log
-
-Delete DedupBin (permanently)
-
-Exit
-
-How Deduplication Works
-Disk selection
+### Disk selection
 
 You choose which SD card root to scan:
 
-/roms (SD1) or
+* `/roms` (SD1) or
+* `/roms2` (SD2) 
 
-/roms2 (SD2) 
-
-Deduplicator
-
-Mode selection
+### Mode selection
 
 You choose one of:
 
-PER: only within the same emulator folder
+* **PER**: only within the same emulator folder
+* **ALL**: across all emulators together 
 
-ALL: across all emulators together 
+If you select **PER**, you can further choose:
 
-Deduplicator
+* all emulators, or
+* a specific emulator folder (filter). 
 
-If you select PER, you can further choose:
+---
 
-all emulators, or
+## Dedup Pipeline Stages
 
-a specific emulator folder (filter). 
+### Stage 1/3 — Collect ROM candidates
 
-Deduplicator
+The script recursively scans the chosen root (`/roms` or `/roms2`) and collects candidate files when:
 
-Dedup Pipeline Stages
-Stage 1/3 — Collect ROM candidates
-
-The script recursively scans the chosen root (/roms or /roms2) and collects candidate files when:
-
-they are inside a valid emulator folder,
-
-the emulator folder exists in EXT_MAP,
-
-the file extension matches allowed extensions for that emulator,
-
-the path is not under images/ or videos/,
-
-the folder is not in ignored roots such as bios, tools, ports, DedupBin, etc. 
-
-Deduplicator
+* they are inside a valid emulator folder,
+* the emulator folder exists in `EXT_MAP`,
+* the file extension matches allowed extensions for that emulator,
+* the path is not under `images/` or `videos/`,
+* the folder is not in ignored roots such as `bios`, `tools`, `ports`, `DedupBin`, etc. 
 
 If no candidates are found:
 
-a friendly message is shown,
+* a friendly message is shown,
+* the log Summary anchor is replaced with a “No ROM files were found.” note so the log does not look truncated. 
 
-the log Summary anchor is replaced with a “No ROM files were found.” note so the log does not look truncated. 
+---
 
-Deduplicator
-
-Stage 2/3 — Read metadata (mtime/size) and detect ZIP inner ROM
+### Stage 2/3 — Read metadata (mtime/size) and detect ZIP inner ROM
 
 For each candidate:
 
-Reads physical file size and modification time (mtime) via stat. 
+* Reads physical file size and modification time (mtime) via `stat`. 
+* If the candidate is a `.zip`:
 
-Deduplicator
-
-If the candidate is a .zip:
-
-Lists contents via unzip -Z1.
-
-Filters inner files by allowed extensions for that emulator (EXT_MAP[emu]).
-
-Accepts the ZIP only if it contains exactly one valid ROM inside. 
-
-Deduplicator
-
-If unzip fails or list is empty, it is logged as BROKEN_ZIP and excluded. 
-
-Deduplicator
+  * Lists contents via `unzip -Z1`.
+  * Filters inner files by allowed extensions for that emulator (`EXT_MAP[emu]`).
+  * Accepts the ZIP only if it contains **exactly one valid ROM** inside. 
+  * If `unzip` fails or list is empty, it is logged as `BROKEN_ZIP` and excluded. 
 
 UI:
 
-A gauge is displayed with percent + current filename from the emulator folder. 
+* A gauge is displayed with percent + current filename from the emulator folder. 
 
-Deduplicator
+---
 
-Stage 3/3 — Compute MD5 hashes
+### Stage 3/3 — Compute MD5 hashes
 
 For each valid candidate:
 
-If it is a normal file: md5sum <file>.
+* If it is a normal file: `md5sum <file>`.
+* If it is a ZIP (with one valid inner ROM):
 
-If it is a ZIP (with one valid inner ROM):
-
-streams inner ROM with unzip -p (with safe escaping for [ ] * ?) 
-
-Deduplicator
-
-runs a size sanity check (wc -c) and then computes MD5.
-
-logs BROKEN_ZIP if streaming/MD5 pipeline fails. 
-
-Deduplicator
-
-If the MD5 equals the empty-stream hash (d41d8…), the file is ignored (excluded from comparison). 
-
-Deduplicator
+  * streams inner ROM with `unzip -p` (with safe escaping for `[ ] * ?`) 
+  * runs a size sanity check (`wc -c`) and then computes MD5.
+  * logs `BROKEN_ZIP` if streaming/MD5 pipeline fails. 
+* If the MD5 equals the empty-stream hash (`d41d8…`), the file is ignored (excluded from comparison). 
 
 UI:
 
-A gauge is displayed with percent + current filename. 
+* A gauge is displayed with percent + current filename. 
 
-Deduplicator
+---
 
-Duplicate Selection Rule (Which File Is Kept)
+## Duplicate Selection Rule (Which File Is Kept)
 
 For each MD5 group with 2+ members:
 
-The script selects the oldest file by modification time (mtime) as the KEEP base.
-
-All newer members become DUP entries. 
-
-Deduplicator
+* The script selects the **oldest file** by modification time (`mtime`) as the **KEEP** base.
+* All newer members become **DUP** entries. 
 
 This means:
 
-the file you copied earlier (older timestamp) is more likely to be kept,
+* the file you copied earlier (older timestamp) is more likely to be kept,
+* newer duplicates are moved to DedupBin if you choose to move them.
 
-newer duplicates are moved to DedupBin if you choose to move them.
+---
 
-What Happens After the Scan
+## What Happens After the Scan
 
 At the end of scanning:
 
-The log is finalized:
+1. The log is finalized:
 
-Summary is inserted after the __SUMMARY__ anchor near the top
+   * Summary is inserted after the `__SUMMARY__` anchor near the top
+   * End marker is appended to the log 
+2. The script shows:
+   `Duplicate scan completed... Details ... in: <root>/tools/Deduplicator.log` 
+   (Note: the actual log write path is `/opt/system/Tools/Deduplicator.log`.)
+3. If duplicates were found, you are prompted to **move duplicates to DedupBin**. 
+4. If broken ZIPs were found, you are prompted to **move broken ZIP files to DedupBin** (even if you declined duplicate moving). 
 
-End marker is appended to the log 
+---
 
-Deduplicator
-
-The script shows:
-Duplicate scan completed... Details ... in: <root>/tools/Deduplicator.log 
-
-Deduplicator
-
-
-(Note: the actual log write path is /opt/system/Tools/Deduplicator.log.)
-
-If duplicates were found, you are prompted to move duplicates to DedupBin. 
-
-Deduplicator
-
-If broken ZIPs were found, you are prompted to move broken ZIP files to DedupBin (even if you declined duplicate moving). 
-
-Deduplicator
-
-DedupBin Layout (Where Files Are Moved)
+## DedupBin Layout (Where Files Are Moved)
 
 When you move duplicates or broken ZIPs, files are moved to:
 
-<ROOT>/DedupBin/<ROOT_NAME>/...
+`<ROOT>/DedupBin/<ROOT_NAME>/...`
 
 Where:
 
-<ROOT> is /roms or /roms2
-
-<ROOT_NAME> is roms or roms2 (used to namespace the bin) 
-
-Deduplicator
+* `<ROOT>` is `/roms` or `/roms2`
+* `<ROOT_NAME>` is `roms` or `roms2` (used to namespace the bin) 
 
 The script preserves the relative path under the root, so restore can put files back into their original emulator folders.
 
-Restore From DedupBin
+---
+
+## Restore From DedupBin
 
 Restore is an “all at once” operation:
 
-Scans DedupBin and shows file count and size.
+* Scans DedupBin and shows file count and size.
+* Restores everything back to ROM folders.
+* **Does not overwrite existing files**: if a destination file already exists, it is skipped.
+* Removes empty directories left behind in DedupBin after restore. 
 
-Restores everything back to ROM folders.
+---
 
-Does not overwrite existing files: if a destination file already exists, it is skipped.
-
-Removes empty directories left behind in DedupBin after restore. 
-
-Deduplicator
-
-Media Cleanup (Orphaned Images/Videos)
+## Media Cleanup (Orphaned Images/Videos)
 
 The cleanup tool detects media that no longer matches any ROM basename:
 
-Images: */images/*-image.*
-
-Videos: */videos/*-video.*
-
-Also handles downloaded_images and downloaded_videos with subfolder rules. 
-
-Deduplicator
+* Images: `*/images/*-image.*`
+* Videos: `*/videos/*-video.*`
+* Also handles `downloaded_images` and `downloaded_videos` with subfolder rules. 
 
 Orphaned media files can be moved into DedupBin (same non-destructive behavior). 
 
-Deduplicator
+---
 
-Log Viewer
+## Log Viewer
 
 “View Deduplicator.log” shows the log in a textbox optimized for small screens:
 
-Creates a temporary wrapped copy using expand (if available) and fold -s to avoid horizontal scrolling. 
+* Creates a temporary wrapped copy using `expand` (if available) and `fold -s` to avoid horizontal scrolling. 
 
-Deduplicator
+---
 
-Notes and Limitations
-ZIP layout requirement
+## Notes and Limitations
 
-ZIPs are only processed if they contain exactly one valid ROM file for the emulator. ZIPs with:
+### ZIP layout requirement
 
-zero valid ROMs, or
+ZIPs are only processed if they contain **exactly one** valid ROM file for the emulator. ZIPs with:
 
-multiple valid ROMs
-are excluded from comparison (not necessarily logged as broken). 
+* zero valid ROMs, or
+* multiple valid ROMs
+  are excluded from comparison (not necessarily logged as broken). 
 
-Deduplicator
+### Archive types other than ZIP
 
-Archive types other than ZIP
+`EXT_MAP` includes extensions like `7z` for some emulators, but the current “archive-aware” logic implemented in this version is ZIP-focused (`unzip` pipeline). Non-ZIP archive files are treated like normal candidates only if they pass extension filtering, but hashing relies on normal file hashing unless ZIP logic is used. 
 
-EXT_MAP includes extensions like 7z for some emulators, but the current “archive-aware” logic implemented in this version is ZIP-focused (unzip pipeline). Non-ZIP archive files are treated like normal candidates only if they pass extension filtering, but hashing relies on normal file hashing unless ZIP logic is used. 
-
-Deduplicator
-
-Performance
+### Performance
 
 MD5 computation requires reading full file contents (and ZIP decompression for ZIP candidates). Large sets and slow SD cards may cause visible pauses in Stage 3/3. 
 
-Deduplicator
+---
 
-Troubleshooting
-“The UI freezes during Stage 3/3”
+## Troubleshooting
+
+### “The UI freezes during Stage 3/3”
 
 This usually means the script is computing MD5 for a slow-to-read file or a ZIP that decompresses slowly. The gauge updates after each file completes, so a long file will look like a “freeze.” 
 
-Deduplicator
+### “Controls don’t work / gamepad doesn’t navigate dialog”
 
-“Controls don’t work / gamepad doesn’t navigate dialog”
+The script uses `gptokeyb` when available and expects `/opt/inttools/keys.gptk`. It also restarts mappings cleanly to avoid stacking. 
 
-The script uses gptokeyb when available and expects /opt/inttools/keys.gptk. It also restarts mappings cleanly to avoid stacking. 
-
-Deduplicator
-
-“Where is the log file?”
+### “Where is the log file?”
 
 The script writes the log to:
 
-/opt/system/Tools/Deduplicator.log 
+* `/opt/system/Tools/Deduplicator.log` 
 
-Deduplicator
+The UI message references `<ROOT>/tools/Deduplicator.log` (root-relative text), but the actual write location is the `/opt/system/Tools/` path.
 
-The UI message references <ROOT>/tools/Deduplicator.log (root-relative text), but the actual write location is the /opt/system/Tools/ path.
+---
 
-License
+## License
 
-n/a
+Add your preferred license here (MIT, GPL, etc.).
 
-Credits
+---
 
-Created by Taras Kukhar.
+## Credits
+
+Created by **Taras Kukhar**. 
