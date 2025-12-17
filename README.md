@@ -313,7 +313,7 @@ The UI message references `<ROOT>/tools/Deduplicator.log` (root-relative text), 
 
 ## License
 
-Add your preferred license here (MIT, GPL, etc.).
+...
 
 ---
 
