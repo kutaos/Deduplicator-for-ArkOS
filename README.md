@@ -1,7 +1,3 @@
-Below is a ready-to-paste **`README.md`** (English) based on the current `Deduplicator.sh` implementation. 
-
----
-
 # Deduplicator for ArkOS (R36S / RG351 etc.)
 
 `Deduplicator.sh` is an on-device ROM deduplication utility for ArkOS that helps you find duplicate ROMs by **content hash (MD5)** and safely move duplicates (and optionally broken ZIP archives) into a restorable **DedupBin** instead of deleting them.
