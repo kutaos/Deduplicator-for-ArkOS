@@ -1242,14 +1242,29 @@ cleanup_media() {
       done
       (( ok == 1 )) || continue
 
-      local base="${r##*/}"
-      base="${base%.*}"
+      local name="${r##*/}"
+      local name_lc="${name,,}"
+
+      # For directories, require a dot to avoid treating plain folders like "roms" as "extensions"
+      if [[ -d "$r" && "$name" != *.* ]]; then
+        continue
+      fi
+
+      local base="${name%.*}"
       base="${base,,}"
+
       ROMS["$emu:$base"]=1
+
+      # If ROM is a folder like "ace.daphne", also add full folder name key ("ace.daphne")
+      if [[ -d "$r" ]]; then
+        ROMS["$emu:$name_lc"]=1
+      fi
     done < <(
-      find "$emu_dir" -type f \
+      find "$emu_dir" \( -type f -o -type d \) \
         ! -path "*/images/*" \
         ! -path "*/videos/*" \
+        ! -path "*/downloaded_images/*" \
+        ! -path "*/downloaded_videos/*" \
         -print0 2>/dev/null || true
     )
   done
