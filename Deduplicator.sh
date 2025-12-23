@@ -1,6 +1,6 @@
 #!/bin/bash
 ###############################################################################
-# Deduplicator for ArkOS by Taras Kukhar v1.1.41 — dialog build
+# Deduplicator for ArkOS by Taras Kukhar v1.1.43 — dialog build
 # GitHub: https://github.com/kutaos/Deduplicator-for-ArkOS
 # - Runs from ArkOS Tools on-device (dialog UI on /dev/tty1)
 # - Never deletes ROMs during dedup: duplicates are moved to DedupBin (restorable)
