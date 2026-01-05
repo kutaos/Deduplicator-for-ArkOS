@@ -1,6 +1,6 @@
 #!/bin/bash
 ###############################################################################
-# Deduplicator for ArkOS by Taras Kukhar v1.1.43 — dialog build
+# Deduplicator for ArkOS by Taras Kukhar v1.1.44 — dialog build
 # GitHub: https://github.com/kutaos/Deduplicator-for-ArkOS
 # - Runs from ArkOS Tools on-device (dialog UI on /dev/tty1)
 # - Never deletes ROMs during dedup: duplicates are moved to DedupBin (restorable)
@@ -1222,9 +1222,15 @@ cleanup_media() {
   declare -a ORPHAN
   ORPHAN=()
   
-  stop_gptokeyb #temporary disable keyboard
-  
-  show_info "Collecting ROM names for media cleanup...\n\nPlease wait."
+  local ROM_NAME_COUNT=0
+  local ROM_NAME_STEP=50  # adjust to reduce/increase refresh frequency
+
+  exec 3> >(
+    dialog --title "Deduplicator $VERSION" \
+           --progressbox 3 45 \
+           >"$CURR_TTY" 2>&1
+  )
+  printf 'Collecting ROM names for media cleanup...\n' >&3
 
   # 1) collect ROM basenames
   for emu_dir in "$ROOT"/*; do
@@ -1253,11 +1259,25 @@ cleanup_media() {
       local base="${name%.*}"
       base="${base,,}"
 
-      ROMS["$emu:$base"]=1
+      local key
+
+      key="$emu:$base"
+      if [[ -z "${ROMS[$key]:-}" ]]; then
+        ROMS["$key"]=1
+        ((ROM_NAME_COUNT++))
+      fi
 
       # If ROM is a folder like "ace.daphne", also add full folder name key ("ace.daphne")
       if [[ -d "$r" ]]; then
-        ROMS["$emu:$name_lc"]=1
+        key="$emu:$name_lc"
+        if [[ -z "${ROMS[$key]:-}" ]]; then
+          ROMS["$key"]=1
+          ((ROM_NAME_COUNT++))
+        fi
+      fi
+
+      if (( ROM_NAME_COUNT % ROM_NAME_STEP == 0 )); then
+        printf 'ROM names collected: %d\n' "$ROM_NAME_COUNT" >&3
       fi
     done < <(
       find "$emu_dir" \( -type f -o -type d \) \
@@ -1268,9 +1288,83 @@ cleanup_media() {
         -print0 2>/dev/null || true
     )
   done
-  
+    printf 'Done. Total ROM names collected: %d\n' "$ROM_NAME_COUNT" >&3
+  exec 3>&-
+
   # 2) scan all media files (images & videos)
-  show_info "Scanning media files (images/videos)...\n\nPlease wait."
+  # Build TOTAL_MEDIA first so we can show a real gauge progress.
+  local TOTAL_MEDIA=0
+  local COUNT_MEDIA=0
+  local LAST_MEDIA_PCT_X100=-1  # hundredths of percent (0..10000)
+
+  # Count media files to scan (same roots as the logic below).
+  for emu_dir in "$ROOT"/*; do
+    [[ -d "$emu_dir" ]] || continue
+    local emu
+    emu="$(basename "$emu_dir")"
+    is_ignored_dir "$emu" && continue
+    [[ -z "${EXT_MAP[$emu]:-}" ]] && continue
+
+    while IFS= read -r -d '' _; do ((TOTAL_MEDIA++)); done < <(
+      find "$emu_dir" -type f -path "*/images/*-image.*" -print0 2>/dev/null || true
+    )
+    while IFS= read -r -d '' _; do ((TOTAL_MEDIA++)); done < <(
+      find "$emu_dir" -type f -path "*/videos/*-video.*" -print0 2>/dev/null || true
+    )
+
+    local di_dir="$emu_dir/downloaded_images"
+    if [[ -d "$di_dir" ]]; then
+      while IFS= read -r -d '' _; do ((TOTAL_MEDIA++)); done < <(
+        find "$di_dir" -type f ! -path "*/default_images/*" -print0 2>/dev/null || true
+      )
+    fi
+
+    local dv_dir="$emu_dir/downloaded_videos"
+    if [[ -d "$dv_dir" ]]; then
+      while IFS= read -r -d '' _; do ((TOTAL_MEDIA++)); done < <(
+        find "$dv_dir" -type f -print0 2>/dev/null || true
+      )
+    fi
+  done
+  (( TOTAL_MEDIA < 1 )) && TOTAL_MEDIA=1
+
+  exec 3> >(
+    dialog --gauge "Scanning media files (images/videos)..." 10 70 0 2>"$CURR_TTY"
+  )
+
+  {
+    echo "XXX"
+    echo "0"
+    echo "Scanning media files (images/videos): 0.00% (0 / $TOTAL_MEDIA)\n\n..."
+    echo "XXX"
+  } >&3
+
+  media_gauge_update() {
+    local current_path="$1"
+
+    ((COUNT_MEDIA++))
+
+    local pct_x100=$(( COUNT_MEDIA * 10000 / TOTAL_MEDIA ))
+    (( pct_x100 > 10000 )) && pct_x100=10000
+
+    if (( pct_x100 != LAST_MEDIA_PCT_X100 )); then
+      LAST_MEDIA_PCT_X100=$pct_x100
+
+      local pct_int=$(( pct_x100 / 100 ))
+      local pct_frac=$(( pct_x100 % 100 ))
+      local pct_str
+      printf -v pct_str "%d.%02d" "$pct_int" "$pct_frac"
+
+      local fname="${current_path##*/}"
+
+      {
+        echo "XXX"
+        echo "$pct_int"
+        echo "Scanning media files (images/videos): ${pct_str}% (${COUNT_MEDIA} / ${TOTAL_MEDIA})\n\n${fname}"
+        echo "XXX"
+      } >&3
+    fi
+  }
 
   for emu_dir in "$ROOT"/*; do
     [[ -d "$emu_dir" ]] || continue
@@ -1282,6 +1376,7 @@ cleanup_media() {
     # images
     while IFS= read -r -d '' img; do
       [[ -f "$img" ]] || continue
+	  media_gauge_update "$img"
       local b
       b="$(basename "$img")"
       b="${b%-image*}"
@@ -1297,6 +1392,7 @@ cleanup_media() {
     # videos
     while IFS= read -r -d '' vid; do
       [[ -f "$vid" ]] || continue
+	  media_gauge_update "$vid"
       local b
       b="$(basename "$vid")"
       b="${b%-video*}"
@@ -1328,6 +1424,7 @@ cleanup_media() {
           BAD_IMG_SUBDIRS+=("$subdir")
           while IFS= read -r -d '' img; do
             [[ -f "$img" ]] || continue
+			media_gauge_update "$img"
             ORPHAN+=("$img")
             ((IMG_CNT[$emu]++))
           done < <(find "$subdir" -type f -print0)
@@ -1337,7 +1434,8 @@ cleanup_media() {
       # 2.2) scan all remaining files under downloaded_images that are not in bad subfolders
       while IFS= read -r -d '' img; do
         [[ -f "$img" ]] || continue
-
+		media_gauge_update "$img"
+		
         # Skip any files inside downloaded_images/default_images
         case "$img" in
           "$di_dir/default_images"/*) continue ;;
@@ -1378,6 +1476,7 @@ cleanup_media() {
           BAD_VID_SUBDIRS+=("$vsubdir")
           while IFS= read -r -d '' vid; do
             [[ -f "$vid" ]] || continue
+			media_gauge_update "$vid"
             ORPHAN+=("$vid")
             ((VID_CNT[$emu]++))
           done < <(find "$vsubdir" -type f -print0)
@@ -1387,7 +1486,7 @@ cleanup_media() {
       # 2.4) scan all remaining files under downloaded_videos that are not in bad subfolders
       while IFS= read -r -d '' vid; do
         [[ -f "$vid" ]] || continue
-
+		media_gauge_update "$vid"
         # skip files in bad subdirs (already marked as orphan above)
         local skip=0
         local badv
@@ -1411,7 +1510,13 @@ cleanup_media() {
     fi
   done
   
-  start_gptokeyb #re-enable keyboard
+  {
+    echo "XXX"
+    echo "100"
+    echo "Scanning media files (images/videos): 100.00% (${COUNT_MEDIA} / ${TOTAL_MEDIA})\n\nCompleted."
+    echo "XXX"
+  } >&3
+  exec 3>&-
   
   if (( ${#ORPHAN[@]} == 0 )); then
     show_msg "No orphaned media files found."
